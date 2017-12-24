@@ -8,7 +8,11 @@
 
 import Foundation
 
-class Item {
+
+// U Swiftu 4 postoji jedan protocol koji zamenjuje Encodabel & Decodable
+// Codable protokol
+
+class Item: Codable {
     var title: String = ""
     var done: Bool = false
     
