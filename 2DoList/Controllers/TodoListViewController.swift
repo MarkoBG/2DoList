@@ -8,8 +8,9 @@
 
 import UIKit
 import CoreData
+import ChameleonFramework
 
-class TodoListViewController: UITableViewController {
+class TodoListViewController: SwipeTableViewController {
     
     var itemArray = [Item]()
     
@@ -20,13 +21,43 @@ class TodoListViewController: UITableViewController {
         }
     }
     
+    @IBOutlet weak var searchBar: UISearchBar!
+    
+    
     let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
     
     let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     override func viewDidLoad() {
         super.viewDidLoad()
-       
+       tableView.separatorStyle = .none
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        
+        guard let hexColor = selectedCategory?.color else {return}
+        
+        title = selectedCategory!.name
+        
+        updateNavBar(withHexCode: hexColor)
+        
+        searchBar.barTintColor = UIColor(hexString: hexColor)
+        
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        updateNavBar(withHexCode: "18AEFF")
+    }
+    
+    //MARK: Setup Nav Bar Methods
+    
+    func updateNavBar(withHexCode hexCodeColorString: String) {
+        guard let navBar = navigationController?.navigationBar else {return}
+        guard let navBarColor = UIColor(hexString: hexCodeColorString) else {return}
+        let contrastColor = ContrastColorOf(navBarColor, returnFlat: true)
+        navBar.barTintColor = navBarColor
+        navBar.tintColor = contrastColor
+        navBar.titleTextAttributes = [NSAttributedStringKey.foregroundColor: contrastColor]
     }
     
     //MARK: TableView DataSource Methods
@@ -36,13 +67,17 @@ class TodoListViewController: UITableViewController {
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
-        let cell = tableView.dequeueReusableCell(withIdentifier: "todoItemCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         
         let item = itemArray[indexPath.row]
         
         cell.textLabel?.text = item.title
-        
         cell.accessoryType = item.done ? .checkmark : .none
+        
+        if let color = UIColor(hexString: (selectedCategory?.color) ?? "18AEFF")?.darken(byPercentage: CGFloat(indexPath.row) / CGFloat(itemArray.count)) {
+            cell.backgroundColor = color
+            cell.textLabel?.textColor = ContrastColorOf(color, returnFlat: true)
+        }
         
         return cell
     }
@@ -128,7 +163,19 @@ class TodoListViewController: UITableViewController {
         
         context.delete(itemArray[item])
         itemArray.remove(at: item)
+        
+        do {
+            try context.save()
+        } catch {
+            print("Error deleting data: \(error)")
+        }
 
+    }
+    
+    //MARK: Delete Data From Swipe
+    
+    override func updateModel(at indexPath: IndexPath) {
+        deleteItem(item: indexPath.row)
     }
 }
 

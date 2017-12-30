@@ -8,8 +8,10 @@
 
 import UIKit
 import CoreData
+import ChameleonFramework
 
-class CategoryViewController: UITableViewController {
+
+class CategoryViewController: SwipeTableViewController {
     
     var categories = [Category]()
     
@@ -17,8 +19,9 @@ class CategoryViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-         navigationController?.navigationBar.tintColor = .white
-         loadCategories()
+        navigationController?.navigationBar.tintColor = .white
+        tableView.separatorStyle = .none
+        loadCategories()
     }
 
     //MARK: TableView Datasource Methods
@@ -28,8 +31,12 @@ class CategoryViewController: UITableViewController {
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "categoryCell", for: indexPath)
+        let cell = super.tableView(tableView, cellForRowAt: indexPath)
         cell.textLabel?.text = categories[indexPath.row].name
+        
+        guard let hexColor = UIColor(hexString: categories[indexPath.row].color ?? "18AEFF") else {fatalError()}
+        cell.backgroundColor = hexColor
+        cell.textLabel?.textColor = ContrastColorOf(hexColor, returnFlat: true)
         return cell
     }
     
@@ -72,6 +79,19 @@ class CategoryViewController: UITableViewController {
         tableView.reloadData()
     }
     
+    //MARK: Delete Data From Swipe
+    
+    override func updateModel(at indexPath: IndexPath) {
+        context.delete(categories[indexPath.row])
+        categories.remove(at: indexPath.row)
+        
+        do {
+            try context.save()
+        } catch {
+            print("Error deleting category: \(error)")
+        }
+    }
+    
     //MARK: Add New Categories
    
     @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
@@ -83,7 +103,7 @@ class CategoryViewController: UITableViewController {
             
             let newCategory = Category(context: self.context)
             newCategory.name = textField.text!
-            
+            newCategory.color = UIColor.randomFlat.hexValue()
             self.categories.append(newCategory)
             
             self.saveCategories()
@@ -100,5 +120,6 @@ class CategoryViewController: UITableViewController {
     }
     
     
-    
+
 }
+
