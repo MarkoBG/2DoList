@@ -36,15 +36,25 @@ class SwipeTableViewController: UITableViewController, SwipeTableViewCellDelegat
             
         }
         
+        let editAction = SwipeAction(style: .default, title: "Edit") { (action, indexPath) in
+            
+            self.editModelItem(at: indexPath)
+            
+        }
+        
         //customize the action appearance
         deleteAction.image = UIImage(named: "delete-icon")
+        editAction.image = UIImage(named: "editItemFilled-icon")
+        editAction.backgroundColor = .blue
         
-        return [deleteAction]
+        
+        return [deleteAction, editAction]
     }
     
     func tableView(_ tableView: UITableView, editActionsOptionsForRowAt indexPath: IndexPath, for orientation: SwipeActionsOrientation) -> SwipeTableOptions {
         var options = SwipeTableOptions()
-        options.expansionStyle = .destructive
+        options.expansionStyle = .destructive(automaticallyDelete: false)
+   //     options.expansionStyle = .destructiveAfterFill
         
         return options
     }
@@ -52,6 +62,10 @@ class SwipeTableViewController: UITableViewController, SwipeTableViewCellDelegat
     func updateModel(at indexPath: IndexPath) {
         //Update our data model
         
+    }
+    
+    func editModelItem(at indexPath: IndexPath) {
+        //Edit item in model
     }
 
 

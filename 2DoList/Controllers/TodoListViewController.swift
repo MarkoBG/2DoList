@@ -10,9 +10,15 @@ import UIKit
 import CoreData
 import ChameleonFramework
 
+protocol ItemsCountProvider {
+    func updateItemsCount()
+}
+
 class TodoListViewController: SwipeTableViewController {
     
     var itemArray = [Item]()
+    
+    var delegate: ItemsCountProvider?
     
     var selectedCategory: Category? {
         didSet {
@@ -22,17 +28,15 @@ class TodoListViewController: SwipeTableViewController {
     }
     
     @IBOutlet weak var searchBar: UISearchBar!
-    
-    
-    let dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist")
-    
+   
     let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     
     override func viewDidLoad() {
         super.viewDidLoad()
-       tableView.separatorStyle = .none
+        tableView.separatorStyle = .none
     }
     
+    //MARK: Lifecycle Methods
     override func viewWillAppear(_ animated: Bool) {
         
         guard let hexColor = selectedCategory?.color else {return}
@@ -47,10 +51,11 @@ class TodoListViewController: SwipeTableViewController {
     
     override func viewWillDisappear(_ animated: Bool) {
         updateNavBar(withHexCode: "18AEFF")
+        let items = itemArray.filter({!$0.done})
+        updateCategory(itemsCount: Int16(items.count))
     }
     
     //MARK: Setup Nav Bar Methods
-    
     func updateNavBar(withHexCode hexCodeColorString: String) {
         guard let navBar = navigationController?.navigationBar else {return}
         guard let navBarColor = UIColor(hexString: hexCodeColorString) else {return}
@@ -90,8 +95,6 @@ class TodoListViewController: SwipeTableViewController {
         
         // Call method to save changes of specific item of itemArray
         saveItems()
-        
-       
         
         // deselect the row when tap on the cell
         tableView.deselectRow(at: indexPath, animated: true)
@@ -164,19 +167,55 @@ class TodoListViewController: SwipeTableViewController {
         
         context.delete(itemArray[item])
         itemArray.remove(at: item)
+
+        saveItems()
+    }
+    
+    func updateCategory(itemsCount: Int16) {
+        let request: NSFetchRequest<Category> = Category.fetchRequest()
+        let predicate = NSPredicate(format: "name MATCHES %@", selectedCategory!.name!)
+        request.predicate = predicate
         
         do {
-            try context.save()
+            guard let category = try context.fetch(request).first else {return}
+            category.itemsCount = itemsCount
+            
+            do {
+                try context.save()
+                delegate?.updateItemsCount()
+            } catch {
+                print("Error saving Category: \(error)")
+            }
         } catch {
-            print("Error deleting data: \(error)")
+            print("Error fetching Category: \(error)")
         }
-
     }
     
     //MARK: Delete Data From Swipe
     
     override func updateModel(at indexPath: IndexPath) {
         deleteItem(item: indexPath.row)
+    }
+    
+    //MARK: Edit Item from swipe
+    
+    override func editModelItem(at indexPath: IndexPath) {
+        var textField = UITextField()
+        guard let item = itemArray[indexPath.row].title else {return}
+        let alert = UIAlertController(title: "Edit category: \(item)", message: "", preferredStyle: .alert)
+        let action = UIAlertAction(title: "Edit", style: .default) { (action) in
+            
+            self.itemArray[indexPath.row].title = textField.text
+            self.saveItems()
+        }
+        
+        alert.addTextField { (alertTextField) in
+            alertTextField.text = self.itemArray[indexPath.row].title
+            textField = alertTextField
+        }
+        
+        alert.addAction(action)
+        present(alert, animated: true, completion: nil)
     }
 }
 

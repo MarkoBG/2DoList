@@ -33,10 +33,12 @@ class CategoryViewController: SwipeTableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = super.tableView(tableView, cellForRowAt: indexPath)
         cell.textLabel?.text = categories[indexPath.row].name
+        cell.detailTextLabel?.text = "(" + String(categories[indexPath.row].itemsCount) + ")"
         
         guard let hexColor = UIColor(hexString: categories[indexPath.row].color ?? "18AEFF") else {fatalError()}
         cell.backgroundColor = hexColor
         cell.textLabel?.textColor = ContrastColorOf(hexColor, returnFlat: true)
+        cell.detailTextLabel?.textColor = ContrastColorOf(hexColor, returnFlat: true)
         return cell
     }
     
@@ -53,6 +55,7 @@ class CategoryViewController: SwipeTableViewController {
         
         guard let indexPath = tableView.indexPathForSelectedRow else {return}
         destinationVC.selectedCategory = categories[indexPath.row]
+        destinationVC.delegate = self
     }
     
     
@@ -79,17 +82,38 @@ class CategoryViewController: SwipeTableViewController {
         tableView.reloadData()
     }
     
+    func updateCategory(at indexPath: IndexPath) {
+        
+    }
+    
     //MARK: Delete Data From Swipe
     
     override func updateModel(at indexPath: IndexPath) {
+
         context.delete(categories[indexPath.row])
         categories.remove(at: indexPath.row)
         
-        do {
-            try context.save()
-        } catch {
-            print("Error deleting category: \(error)")
+        saveCategories()
+    }
+    
+    //MARK: Edit Category from Swipe
+    override func editModelItem(at indexPath: IndexPath) {
+        var textField = UITextField()
+        guard let category = categories[indexPath.row].name else {return}
+        let alert = UIAlertController(title: "Edit category: \(category)", message: "", preferredStyle: .alert)
+        let action = UIAlertAction(title: "Edit", style: .default) { (action) in
+            
+            self.categories[indexPath.row].name = textField.text
+            self.saveCategories()
         }
+        
+        alert.addTextField { (alertTextField) in
+            alertTextField.text = self.categories[indexPath.row].name
+            textField = alertTextField
+        }
+        
+        alert.addAction(action)
+        present(alert, animated: true, completion: nil)
     }
     
     //MARK: Add New Categories
@@ -104,6 +128,7 @@ class CategoryViewController: SwipeTableViewController {
             let newCategory = Category(context: self.context)
             newCategory.name = textField.text!
             newCategory.color = UIColor.randomFlat.hexValue()
+            newCategory.itemsCount = 0
             self.categories.append(newCategory)
             
             self.saveCategories()
@@ -118,8 +143,14 @@ class CategoryViewController: SwipeTableViewController {
         present(alert, animated: true, completion: nil)
         
     }
-    
-    
+}
 
+//MARK: Implement Protocol ItemsCountProvider
+
+extension CategoryViewController: ItemsCountProvider {
+    
+    func updateItemsCount() {
+        tableView.reloadData()
+    }
 }
 
