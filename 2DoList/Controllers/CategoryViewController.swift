@@ -7,21 +7,21 @@
 //
 
 import UIKit
-import CoreData
 import ChameleonFramework
 
 
 class CategoryViewController: SwipeTableViewController {
     
     var categories = [Category]()
-    
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
+    var storageController: StorageController!
+    
     override func viewDidLoad() {
         super.viewDidLoad()
-        navigationController?.navigationBar.tintColor = .white
+        self.setStatusBarStyle(UIStatusBarStyleContrast)
         tableView.separatorStyle = .none
-        loadCategories()
+ 
+        categories = storageController.fetchData()
     }
 
     //MARK: TableView Datasource Methods
@@ -35,10 +35,8 @@ class CategoryViewController: SwipeTableViewController {
         cell.textLabel?.text = categories[indexPath.row].name
         cell.detailTextLabel?.text = "(" + String(categories[indexPath.row].itemsCount) + ")"
         
-        guard let hexColor = UIColor(hexString: categories[indexPath.row].color ?? "18AEFF") else {fatalError()}
-        cell.backgroundColor = hexColor
-        cell.textLabel?.textColor = ContrastColorOf(hexColor, returnFlat: true)
-        cell.detailTextLabel?.textColor = ContrastColorOf(hexColor, returnFlat: true)
+        cell.textLabel?.textColor = UIColor.flatBlueDark
+        cell.detailTextLabel?.textColor = UIColor.flatBlueDark
         return cell
     }
     
@@ -54,46 +52,18 @@ class CategoryViewController: SwipeTableViewController {
         let destinationVC = segue.destination as! TodoListViewController
         
         guard let indexPath = tableView.indexPathForSelectedRow else {return}
+        destinationVC.storageController = storageController
         destinationVC.selectedCategory = categories[indexPath.row]
         destinationVC.delegate = self
     }
-    
-    
-    //MARK: Data Manipulation Methods
-    
-    func saveCategories() {
-        do {
-            try context.save()
-        } catch {
-            print("Error saving categories: \(error)")
-        }
-        
-        tableView.reloadData()
-    }
-    
-    func loadCategories(with request: NSFetchRequest<Category> = Category.fetchRequest()) {
-        
-        do {
-            categories = try context.fetch(request)
-        } catch {
-            print("Error fetchnig from context: \(error)")
-        }
-        
-        tableView.reloadData()
-    }
-    
-    func updateCategory(at indexPath: IndexPath) {
-        
-    }
-    
+
     //MARK: Delete Data From Swipe
     
     override func updateModel(at indexPath: IndexPath) {
 
-        context.delete(categories[indexPath.row])
+        storageController.delete(item: categories[indexPath.row])
         categories.remove(at: indexPath.row)
-        
-        saveCategories()
+        tableView.reloadData()
     }
     
     //MARK: Edit Category from Swipe
@@ -104,7 +74,8 @@ class CategoryViewController: SwipeTableViewController {
         let action = UIAlertAction(title: "Edit", style: .default) { (action) in
             
             self.categories[indexPath.row].name = textField.text
-            self.saveCategories()
+            self.storageController.save()
+            self.tableView.reloadData()
         }
         
         alert.addTextField { (alertTextField) in
@@ -125,13 +96,14 @@ class CategoryViewController: SwipeTableViewController {
         let alert = UIAlertController(title: "Add new category", message: "", preferredStyle: .alert)
         let action = UIAlertAction(title: "Add category", style: .default) { (action) in
             
-            let newCategory = Category(context: self.context)
+            let newCategory = Category(context: self.storageController.context)
             newCategory.name = textField.text!
-            newCategory.color = UIColor.randomFlat.hexValue()
+            newCategory.color = UIColor.flatMint.hexValue()
             newCategory.itemsCount = 0
             self.categories.append(newCategory)
             
-            self.saveCategories()
+            self.storageController.save()
+            self.tableView.reloadData()
         }
         
         alert.addTextField { (alertTextField) in

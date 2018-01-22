@@ -14,7 +14,7 @@ class SwipeTableViewController: UITableViewController, SwipeTableViewCellDelegat
     override func viewDidLoad() {
         super.viewDidLoad()
 
-         tableView.rowHeight = 65.0
+         tableView.rowHeight = 55.0
         
     }
     
@@ -22,6 +22,7 @@ class SwipeTableViewController: UITableViewController, SwipeTableViewCellDelegat
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as! SwipeTableViewCell
         cell.delegate = self
+
         return cell
         
     }
@@ -44,7 +45,7 @@ class SwipeTableViewController: UITableViewController, SwipeTableViewCellDelegat
         
         //customize the action appearance
         deleteAction.image = UIImage(named: "delete-icon")
-        editAction.image = UIImage(named: "editItemFilled-icon")
+        editAction.image = UIImage(named: "edit-icon")
         editAction.backgroundColor = .blue
         
         

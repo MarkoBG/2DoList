@@ -20,6 +20,8 @@ class TodoListViewController: SwipeTableViewController {
     
     var delegate: ItemsCountProvider?
     
+    var storageController: StorageController!
+    
     var selectedCategory: Category? {
         didSet {
             //Load items from context - core data
@@ -28,35 +30,31 @@ class TodoListViewController: SwipeTableViewController {
     }
     
     @IBOutlet weak var searchBar: UISearchBar!
-   
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        tableView.separatorStyle = .none
-    }
+
     
     //MARK: Lifecycle Methods
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        tableView.separatorStyle = .singleLine
+        tableView.separatorColor = .flatBlueDark
+        Appearance.setGradiantColor(for: tableView)
+    }
+    
     override func viewWillAppear(_ animated: Bool) {
         
         guard let hexColor = selectedCategory?.color else {return}
-        
         title = selectedCategory!.name
-        
-        updateNavBar(withHexCode: hexColor)
-        
+ //       updateNavBar(withHexCode: hexColor)
         searchBar.barTintColor = UIColor(hexString: hexColor)
-        
     }
     
     override func viewWillDisappear(_ animated: Bool) {
-        updateNavBar(withHexCode: "18AEFF")
         let items = itemArray.filter({!$0.done})
         updateCategory(itemsCount: Int16(items.count))
     }
     
     //MARK: Setup Nav Bar Methods
-    func updateNavBar(withHexCode hexCodeColorString: String) {
+    private func updateNavBar(withHexCode hexCodeColorString: String) {
         guard let navBar = navigationController?.navigationBar else {return}
         guard let navBarColor = UIColor(hexString: hexCodeColorString) else {return}
         let contrastColor = ContrastColorOf(navBarColor, returnFlat: true)
@@ -77,39 +75,57 @@ class TodoListViewController: SwipeTableViewController {
         let item = itemArray[indexPath.row]
         
         cell.textLabel?.text = item.title
-        cell.accessoryType = item.done ? .checkmark : .none
+        //        cell.accessoryType = item.done ? .checkmark : .none
         
-        if let color = UIColor(hexString: (selectedCategory?.color) ?? "18AEFF")?.darken(byPercentage: CGFloat(indexPath.row) / CGFloat(itemArray.count)) {
-            cell.backgroundColor = color
-            cell.textLabel?.textColor = ContrastColorOf(color, returnFlat: true)
-            cell.tintColor = ContrastColorOf(color, returnFlat: true)
-        }
+        cell.textLabel?.textColor = item.done ? .flatGray : UIColor.flatBlueDark
+        cell.tintColor = UIColor.flatBlueDark
+        cell.imageView?.image = item.done ? UIImage(named: "checked-icon") : UIImage(named: "unchecked-icon")
+        cell.textLabel?.attributedText = item.title?.strikeThroughStyle(item.done)
+        cell.imageView?.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(checkBoxImageTapped(recognizer:))))
         
         return cell
     }
 
+    @objc func checkBoxImageTapped(recognizer: UITapGestureRecognizer) {
+        let tapLocation = recognizer.location(in: tableView)
+        guard let tapIndexPath = tableView.indexPathForRow(at: tapLocation) else {return}
+        itemArray[tapIndexPath.row].done = !itemArray[tapIndexPath.row].done
+        storageController.save()
+        tableView.reloadData()
+        print("ImageView tapped for cell: \(tapIndexPath.row)")
+    }
+    
     //MARK: TableView Delegate Methods
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
-        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
+//        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
         
         // Call method to save changes of specific item of itemArray
-        saveItems()
+//        storageController.save()
+//        tableView.reloadData()
         
         // deselect the row when tap on the cell
+        
+        performSegue(withIdentifier: "itemDetails", sender: self)
         tableView.deselectRow(at: indexPath, animated: true)
+
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        let destinationVC = segue.destination as! ItemDetailsViewController
+        guard let indexPath = tableView.indexPathForSelectedRow else {fatalError()}
+        destinationVC.storageController = storageController
+        destinationVC.selectedItem = itemArray[indexPath.row]
     }
     
     //MARK: Add New Items
     @IBAction func adduttonPressed(_ sender: UIBarButtonItem) {
         
         var textField = UITextField()
-        
         let alert = UIAlertController(title: "Add new Todo List Item", message: "", preferredStyle: .alert)
-        
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             
-            let newItem = Item(context: self.context)
+            let newItem = Item(context: self.storageController.context)
             newItem.title = textField.text!
             newItem.done = false
             newItem.parentCategory = self.selectedCategory
@@ -117,8 +133,8 @@ class TodoListViewController: SwipeTableViewController {
             self.itemArray.append(newItem)
             
             // Call method to save newItem
-            self.saveItems()
-
+            self.storageController.save()
+            self.tableView.reloadData()
         }
         
         alert.addTextField { (alertTextField) in
@@ -126,23 +142,16 @@ class TodoListViewController: SwipeTableViewController {
             textField = alertTextField
         }
         
+        let cancelAction = UIAlertAction(title: "Cancel", style: .destructive, handler: nil)
+        
         alert.addAction(action)
+        alert.addAction(cancelAction)
         present(alert, animated: true, completion: nil)
     }
     
     //MARK: Model manipulation methods
-    func saveItems() {
-        
-        do {
-           try context.save()
-        } catch {
-            print("Error saving context: \(error)")
-        }
-        
-        tableView.reloadData()
-    }
-    
-    func loadItems(with request: NSFetchRequest<Item> = Item.fetchRequest(), predicate: NSPredicate? = nil) {
+
+    func loadItems(with request: NSFetchRequest<NSFetchRequestResult> = Item.fetchRequest(), predicate: NSPredicate? = nil) {
 
         let categoryPredicate = NSPredicate(format: "parentCategory.name MATCHES %@", selectedCategory!.name!)
 
@@ -152,49 +161,29 @@ class TodoListViewController: SwipeTableViewController {
         } else {
             request.predicate = categoryPredicate
         }
-        
-        do {
-           itemArray = try context.fetch(request)
-        } catch {
-            print("Error fetching data from context: \(error)")
-        }
+
+        itemArray = storageController.fetchData(with: request)
 
         tableView.reloadData()
-        
-    }
-    
-    func deleteItem(item: Int) {
-        
-        context.delete(itemArray[item])
-        itemArray.remove(at: item)
-
-        saveItems()
     }
     
     func updateCategory(itemsCount: Int16) {
-        let request: NSFetchRequest<Category> = Category.fetchRequest()
+        let request: NSFetchRequest<NSFetchRequestResult> = Category.fetchRequest()
         let predicate = NSPredicate(format: "name MATCHES %@", selectedCategory!.name!)
         request.predicate = predicate
         
-        do {
-            guard let category = try context.fetch(request).first else {return}
-            category.itemsCount = itemsCount
-            
-            do {
-                try context.save()
-                delegate?.updateItemsCount()
-            } catch {
-                print("Error saving Category: \(error)")
-            }
-        } catch {
-            print("Error fetching Category: \(error)")
-        }
+        guard let category: Category = storageController.fetchData(with: request).first else {return}
+        category.itemsCount = itemsCount
+        storageController.save()
+        delegate?.updateItemsCount()
     }
     
     //MARK: Delete Data From Swipe
     
     override func updateModel(at indexPath: IndexPath) {
-        deleteItem(item: indexPath.row)
+        storageController.delete(item: itemArray[indexPath.row])
+        itemArray.remove(at: indexPath.row)
+        tableView.reloadData()
     }
     
     //MARK: Edit Item from swipe
@@ -206,7 +195,8 @@ class TodoListViewController: SwipeTableViewController {
         let action = UIAlertAction(title: "Edit", style: .default) { (action) in
             
             self.itemArray[indexPath.row].title = textField.text
-            self.saveItems()
+            self.storageController.save()
+            self.tableView.reloadData()
         }
         
         alert.addTextField { (alertTextField) in
@@ -225,7 +215,7 @@ extension TodoListViewController: UISearchBarDelegate {
     
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         
-        let request: NSFetchRequest<Item> = Item.fetchRequest()
+        let request: NSFetchRequest<NSFetchRequestResult> = Item.fetchRequest()
         
         //pravimo objekat "predicate" koji ce da izvrsi pretragu, prema tekstu koji unesemo u search bar
         //pretraga se vrsi tako sto se poredi da li tekst koji smo uneli se sadrzi u propertiju "title"

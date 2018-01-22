@@ -18,6 +18,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
         
+        Appearance.setGlobalAppearance(for: application)
+        
+        let initialController = window?.rootViewController as! UINavigationController
+        let firstController = initialController.viewControllers.first! as! CategoryViewController
+        firstController.storageController = StorageController(context: persistentContainer.viewContext)
         return true
     }
 
